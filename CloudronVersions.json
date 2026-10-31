@@ -1,0 +1,70 @@
+{
+    "stable": true,
+    "versions": {
+        "0.1.0": {
+            "manifest": {
+                "id": "io.github.orcvole.harnessrouter",
+                "title": "HarnessRouter",
+                "author": "HarnessRouter",
+                "packagerName": "OrcVole",
+                "packagerUrl": "https://github.com/OrcVole/harnessrouter-cloudron",
+                "contactEmail": "OrcVole@users.noreply.github.com",
+                "version": "0.1.0",
+                "upstreamVersion": "0.37.13",
+                "manifestVersion": 2,
+                "minBoxVersion": "10.0.0",
+                "website": "https://github.com/HarnessRouter/harnessrouter",
+                "dockerImage": "ghcr.io/orcvole/harnessrouter-cloudron@sha256:b99c298e23ca0f84c15f6b79f8f10cc40dcc7a6129c71e9ee8bfed5b1c2642fe",
+                "tagline": "One API and console in front of your agent CLIs",
+                "description": "HarnessRouter is a self-hosted API and console in front of agent command-line tools such as OpenCode, Codex and Claude Code. Your own product or scripts talk to one OpenAI Responses-compatible API; HarnessRouter runs the chosen agent, streams its progress and keeps the transcripts.\n\n<upstream>0.37.13</upstream>\n\n**What this package does**\n\n* Runs the console, the gateway and the runner in one container, with all state under `/app/data`.\n* Generates the console password on first start. It never ships the published default.\n* Runs every agent session as its own user, behind an egress firewall, and keeps your provider keys out of the agents' reach (broker mode).\n\n**What to know before you install**\n\n* Agents run bash and git on your server. Give them only the connections you are willing to have used by anyone who can sign in.\n* Agent command-line tools are downloaded on first start, under their own licences. The first start can take several minutes.\n",
+                "changelog": "* First package of HarnessRouter Community Edition 0.37.13, rebuilt from upstream source on `cloudron/base` 6.0.1.\n* Broker mode is forced: agents never hold a real provider key.\n* Each agent session runs as its own user behind an IPv4 and IPv6 egress firewall; the app refuses to start if the firewall cannot be installed.\n* The console password is generated on first start; the published default is refused.\n* Agent session workspaces are kept outside the backup and rebuilt from each session's checkpoint.\n* Default memory limit 4 GiB, measured against ten concurrent agent sessions.\n",
+                "postInstallMessage": "**First sign-in**\n\nThe console password is generated on first start. Open the web terminal for this app and run:\n\n    cat /app/data/.secrets/admin-password\n\nSign in as `harnessrouter` with that password, then change it on the Profile page. A password changed there replaces the generated one from then on, across restarts, and the file above no longer holds your password.\n\n**If you forget a password you set**, open the web terminal, run `mv /app/data/selfhost-auth.json /app/data/selfhost-auth.json.old`, then restart the app: the password in `/app/data/.secrets/admin-password` works again. Until the restart the console does not answer.\n\n**The first start is slow**\n\nAgent command-line tools are downloaded into `/app/data` the first time the app starts. The console does not answer until that finishes, so a first start of several minutes is normal. Later starts are quick.\n\n**What this package cannot prevent**\n\nAgents execute code on this server. Each session runs as its own user behind an egress firewall, and provider keys are held by the HarnessRouter service, not by the agents. Anyone who can sign in can still use the connections you add. If the firewall cannot be installed, the app refuses to start rather than run agents unconfined.\n\n**Settings**\n\nOptional settings go in `/app/data/env`, one `HR_NAME=value` per line; the file is read, never executed, and the settings that carry the security model are ignored. Create it with `umask 077` first (agents can read a file there that is readable by everyone), then restart the app; every start also makes it readable by root only.\n\n**Backups**\n\nTranscripts, secrets, your password and the installed agent tools are in the app's backup. Agent session workspaces are not: each is rebuilt from its session's checkpoint, which is backed up.\n",
+                "httpPort": 3000,
+                "healthCheckPath": "/login",
+                "configurePath": "/",
+                "memoryLimit": 4294967296,
+                "capabilities": [
+                    "net_admin"
+                ],
+                "addons": {
+                    "localstorage": {}
+                },
+                "optionalSso": false,
+                "checklist": {
+                    "read-the-admin-password": {
+                        "message": "The console password is generated on first start and saved at /app/data/.secrets/admin-password. Read it from the web terminal, then change it on the Profile page."
+                    },
+                    "agent-clis-install-on-first-start": {
+                        "message": "Agent CLIs are downloaded into /app/data on first start, under their own licences. The first start can take several minutes."
+                    },
+                    "agents-run-code": {
+                        "message": "Agents run bash and git on this server. The package confines them with per-session users and an egress firewall, but a connection you give it can still be used by whoever can sign in."
+                    },
+                    "workspaces-not-backed-up": {
+                        "message": "Agent session workspaces are kept outside the backup. They are caches of each session's checkpoint, which is backed up, and are rebuilt on the next turn. Idle workspaces are removed after 72 hours (HR_WORKSPACE_TTL_HOURS in /app/data/env). Anything an agent has not finished in a turn is in its checkpoint, not in the backup of its working directory."
+                    }
+                },
+                "tags": [
+                    "ai",
+                    "agents",
+                    "api",
+                    "automation"
+                ],
+                "icon": "file://logo.png",
+                "persistentDirs": [
+                    "/app/workspaces",
+                    "/app/ws-markers"
+                ],
+                "iconUrl": "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/logo.png",
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/screenshots/start.png",
+                    "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/screenshots/model-keys.png",
+                    "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/screenshots/api-keys.png"
+                ]
+            },
+            "creationDate": "Sat, 31 Oct 2026 19:29:01 GMT",
+            "ts": 1793474941000,
+            "publishState": "published"
+        }
+    }
+}

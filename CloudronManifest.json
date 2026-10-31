@@ -10,7 +10,7 @@
   "manifestVersion": 2,
   "minBoxVersion": "10.0.0",
   "website": "https://github.com/HarnessRouter/harnessrouter",
-  "dockerImage": "",
+  "dockerImage": "ghcr.io/orcvole/harnessrouter-cloudron@sha256:b99c298e23ca0f84c15f6b79f8f10cc40dcc7a6129c71e9ee8bfed5b1c2642fe",
   "tagline": "One API and console in front of your agent CLIs",
   "description": "file://DESCRIPTION.md",
   "changelog": "file://CHANGELOG.md",
@@ -50,5 +50,11 @@
   "persistentDirs": [
     "/app/workspaces",
     "/app/ws-markers"
+  ],
+  "iconUrl": "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/logo.png",
+  "mediaLinks": [
+    "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/screenshots/start.png",
+    "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/screenshots/model-keys.png",
+    "https://raw.githubusercontent.com/OrcVole/harnessrouter-cloudron/main/screenshots/api-keys.png"
   ]
 }
