@@ -119,6 +119,8 @@ COPY --from=src /src/runner/  /app/runner/
 COPY --from=src /src/docker/entrypoint.sh /app/entrypoint.sh
 COPY --from=src /src/docker/locks/ /app/locks/
 COPY --from=src /src/docker/hr-retention /usr/local/bin/hr-retention
+# Apache-2.0 section 4(d): a redistribution carries upstream's NOTICE (and its LICENSE beside it).
+COPY --from=src /src/LICENSE /src/NOTICE /app/
 RUN chmod +x /app/entrypoint.sh /usr/local/bin/hr-retention
 
 COPY --from=ui /ui/.next/standalone /app/ui/

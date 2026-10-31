@@ -35,6 +35,9 @@ for f in .hr-env agent-tools environments; do
   [ -e "${DATA}/${f}" ] && chown -R root:root "${DATA}/${f}"
 done
 chown agent:agent "${DATA}"
+# The product user's HOME holds its npm cache and logs and whatever its tools write later: not for session uids to read (it was
+# created 0755; turns on opencode and codex work with 0700, measured).
+chmod 0700 "${DATA}/home"
 # Top level only: every session directory inside is owned by its own session uid (0700) and must stay that way. A recursive chown here
 # would hand them all to the product's user and a resumed session would lose write access to its own workspace.
 chown agent:agent "${WS}"; chmod 0751 "${WS}"
@@ -63,7 +66,8 @@ export HR_DATA_DIR="${DATA}" HARNESS_WORKSPACE="${WS}" HR_WS_MARKER_DIR="${WSM}"
 export HR_AUTH_STORE="${DATA}/selfhost-auth.json"     # upstream defaults this to a literal /data path
 export HR_SANDBOX_TRUST=broker                         # any value but "owner" is fail-closed broker mode
 export WITH_STARTER_KITS=0
-# `proxyAuth` reserves /login; the console is reached by its own login page.
+# No `proxyAuth`: measured on a test install, its wall takes /login from the console, blocks public share links, and lets any
+# request that carries an `Authorization: Bearer` header through, so the console's own login stays the real gate.
 # Session uids: moved to a high range, away from other containers' uids (RLIMIT_NPROC counts per real uid).
 # Upstream's span is a fixed 40000 (runner/server.py); the firewall below uses the same numbers.
 UID_BASE=70000; UID_SPAN=40000
@@ -81,6 +85,9 @@ export CLAUDE_CODE_VERSION=2.1.280                     # upstream's tested pin a
 # compromised console could write this file; sourcing it as root would turn that into root at the next boot.
 # Only simple HR_* settings pass, and the settings that carry the security model cannot be changed here.
 ENVFILE="${DATA}/env"
+# Session uids can traverse /app/data (they run the agent tools under it), so a file whose name they know is readable unless its
+# mode says otherwise, and a file made in the web terminal is 0644 (measured: a session read it). It may carry tokens.
+[ -f "${ENVFILE}" ] && { chown root:root "${ENVFILE}"; chmod 0600 "${ENVFILE}"; }
 if [ -f "${ENVFILE}" ]; then
   while IFS= read -r line || [ -n "${line}" ]; do
     case "${line}" in ''|'#'*) continue ;; esac
@@ -108,16 +115,21 @@ export HR_BACKENDS="${kept}"
 # ---------------------------------------------------------------------------------------------
 fw_ok=1
 UIDS="${UID_BASE}-$((UID_BASE + UID_SPAN - 1))"
+# A kernel booted without IPv6 has no /proc/net/if_inet6 and no IPv6 sockets at all, so there is no IPv6 egress to filter, and
+# ip6tables would fail and refuse the whole app. Only that case skips the IPv6 rules; IPv6 switched off by sysctl still gets them.
+have_v6=1; [ -e /proc/net/if_inet6 ] || have_v6=0
 v4() { iptables  -A OUTPUT -m owner --uid-owner "${UIDS}" "$@" || fw_ok=0; }
-v6() { ip6tables -A OUTPUT -m owner --uid-owner "${UIDS}" "$@" || fw_ok=0; }
+v6() { (( have_v6 )) || return 0; ip6tables -A OUTPUT -m owner --uid-owner "${UIDS}" "$@" || fw_ok=0; }
 command -v iptables >/dev/null && command -v ip6tables >/dev/null || die "iptables is missing from the image"
 iptables -S OUTPUT >/dev/null 2>&1 || die "cannot read the firewall (is the net_admin capability granted?)"
 # Re-running on a restart of the same container must not stack rules.
-iptables  -S OUTPUT 2>/dev/null | grep -q -- "--uid-owner ${UIDS}" && { iptables -F OUTPUT; ip6tables -F OUTPUT 2>/dev/null || true; }
+iptables  -S OUTPUT 2>/dev/null | grep -q -- "--uid-owner ${UIDS}" && { iptables -F OUTPUT; (( have_v6 )) && ip6tables -F OUTPUT 2>/dev/null || true; }
 
 ns4="$(awk '/^nameserver/ && $2 !~ /:/ {print $2; exit}' /etc/resolv.conf)"
 ns6="$(awk '/^nameserver/ && $2 ~ /:/ {print $2; exit}' /etc/resolv.conf)"
-# The runner (root, spawns sessions) is never an agent's business. Then what an agent legitimately needs.
+# The runner's control port (root, spawns sessions) is never an agent's business. The runner also opens a credential relay on an
+# ephemeral loopback port that agents DO use: it answers only a per-turn random token (401 otherwise, measured), so it stays open.
+# Then what an agent legitimately needs.
 v4 -d 127.0.0.1 -p tcp --dport 8081 -j REJECT
 v6 -d ::1       -p tcp --dport 8081 -j REJECT
 if [ -n "${ns4}" ]; then for p in udp tcp; do v4 -d "${ns4}" -p "${p}" --dport 53 -j ACCEPT; done; fi
@@ -134,13 +146,14 @@ for port in 25 465 587; do v6 -p tcp --dport "${port}" -j REJECT; done
 (( fw_ok )) || die "an agent firewall rule could not be installed (is the net_admin capability granted?)"
 
 # Self-test from a session uid: the reverse proxy's plain-HTTP port is closed by the rules above, and open to
-# anyone without them, so a connection that SUCCEEDS means the rules did not hold. (Falsified on purpose in
-# test/containment.sh by running this with the rules removed.)
+# anyone without them, so a connection that SUCCEEDS means the rules did not hold. (Falsified on purpose while packaging:
+# with the rules removed, the self-test reported the breach.)
 if timeout 4 setpriv --reuid="$((UID_BASE + 1))" --regid="$((UID_BASE + 1))" --clear-groups \
      bash -c 'echo > /dev/tcp/172.18.0.1/80' 2>/dev/null; then
   die "self-test: a session uid reached the reverse proxy on port 80 despite the rules"
 fi
-log "firewall : active for uids ${UIDS} (IPv4 and IPv6); self-test refused as expected"
+if (( have_v6 )); then log "firewall : active for uids ${UIDS} (IPv4 and IPv6); self-test refused as expected"
+else log "firewall : active for uids ${UIDS} (IPv4; this kernel has no IPv6); self-test refused as expected"; fi
 
 # ---------------------------------------------------------------------------------------------
 # 5. Nothing of Cloudron's reaches an agent: drop every CLOUDRON_* variable, then hand over.

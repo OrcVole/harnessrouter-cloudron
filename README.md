@@ -13,8 +13,11 @@ gated on a Cloudron 10 test install only (upstream 0.37.13, package 0.1.0).
 - One container: console (3000), gateway (8080) and runner (8081), SQLite, all state under `/app/data`.
 - Generates the console password and the secret key on first start; the published default password is refused.
 - **Broker mode** (`HR_SANDBOX_TRUST=broker`): every agent session runs as its own unprivileged user, behind an egress firewall, and provider
-  keys stay with the HarnessRouter service, out of the agents' reach. If the firewall cannot be installed, the app refuses to start agents
-  rather than running them unconfined. The package needs the `net_admin` capability for this and for nothing else.
+  keys stay with the HarnessRouter service, out of the agents' reach. If the firewall cannot be installed, the app refuses to start
+  rather than run agents unconfined. The package needs the `net_admin` capability for this and for nothing else.
+  What was measured, and what the package cannot prevent: `docs/CONTAINMENT.md`.
+- The console keeps its own login. There is no Cloudron login wall (`proxyAuth`): on a test install it took the console's `/login`,
+  blocked share links and let any `Authorization: Bearer` header through (details in `docs/CONTAINMENT.md`).
 - Agent CLIs are downloaded on first start into the data volume, under their own licences; they are not in the image.
 - Agent session workspaces live in `persistentDirs` (outside the backup, rebuilt from checkpoints); transcripts and secrets are in the backup.
 - The operator's `/app/data/env` file is parsed against an allowlist, never executed.
@@ -23,12 +26,13 @@ gated on a Cloudron 10 test install only (upstream 0.37.13, package 0.1.0).
 
 | Script | What it proves |
 |---|---|
-| `test/containment.sh` | run as root inside the app: the firewall rules, reachability from a session uid (each "blocked" result has a root control), data isolation, session-to-session isolation, no `CLOUDRON_*` in the entrypoint's environment |
-| `test/memory-gate/` | idle against production-like load, judged on anonymous memory (see `docs/MEMORY-GATE.md`) |
+| `test/containment.sh` | run as root inside the app: every firewall rule by name, reachability from a session uid (each "blocked" result has a root control), other loopback listeners refuse a request without a token, read and write isolation of the product's data, what the runner passes to agents, session-to-session isolation on the real layout |
+| `test/memory-gate/` | idle against production-like load, judged on anonymous memory (see `docs/MEMORY-GATE.md`); `stub.py` is also the broker canary's model |
 | `test/secret-scan.sh` | the pre-publish anonymity and credential scan over the repository and the exact image digest |
 
 `docs/MEMORY-GATE.md` lists what the memory run does not measure.
 
 ## Licence
 
-The packaging is Apache-2.0 (see `LICENSE`). HarnessRouter Community Edition keeps its own licence; the agent CLIs it installs keep theirs.
+The packaging is Apache-2.0 (see `LICENSE`). HarnessRouter Community Edition is Apache-2.0 too; the image carries its `LICENSE` and `NOTICE`
+at `/app/LICENSE` and `/app/NOTICE`. The agent CLIs it installs on first start keep their own licences.
