@@ -1,0 +1,9 @@
+# Fixed strings secret-scan may ignore. Each line is a REVIEWABLE CLAIM that the string is public by
+# design, never a way to quieten a real leak. Only ever list something already published on purpose.
+#
+# The declared Cloudron contactEmail: public by definition (every manifest carries one).
+OrcVole@users.noreply.github.com
+#
+# One line of upstream's bundled imagegen skill text (an example photo prompt) trips a generic identity pattern.
+# It is public upstream text, pinned by commit in the Dockerfile.
+sample-prompts.md:25:Primary request: candid photo of an elderly sailor on a small fishing boat adjusting a net

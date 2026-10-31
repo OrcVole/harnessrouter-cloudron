@@ -1,0 +1,54 @@
+{
+  "id": "io.github.orcvole.harnessrouter",
+  "title": "HarnessRouter",
+  "author": "HarnessRouter",
+  "packagerName": "OrcVole",
+  "packagerUrl": "https://github.com/OrcVole/harnessrouter-cloudron",
+  "contactEmail": "OrcVole@users.noreply.github.com",
+  "version": "0.1.0",
+  "upstreamVersion": "0.37.13",
+  "manifestVersion": 2,
+  "minBoxVersion": "10.0.0",
+  "website": "https://github.com/HarnessRouter/harnessrouter",
+  "dockerImage": "",
+  "tagline": "One API and console in front of your agent CLIs",
+  "description": "file://DESCRIPTION.md",
+  "changelog": "file://CHANGELOG.md",
+  "postInstallMessage": "file://POSTINSTALL.md",
+  "httpPort": 3000,
+  "healthCheckPath": "/login",
+  "configurePath": "/",
+  "memoryLimit": 4294967296,
+  "capabilities": [
+    "net_admin"
+  ],
+  "addons": {
+    "localstorage": {}
+  },
+  "optionalSso": false,
+  "checklist": {
+    "read-the-admin-password": {
+      "message": "The console password is generated on first start and saved at /app/data/.secrets/admin-password. Read it from the web terminal, then change it on the Profile page."
+    },
+    "agent-clis-install-on-first-start": {
+      "message": "Agent CLIs are downloaded into /app/data on first start, under their own licences. The first start can take several minutes."
+    },
+    "agents-run-code": {
+      "message": "Agents run bash and git on this server. The package confines them with per-session users and an egress firewall, but a connection you give it can still be used by whoever can sign in."
+    },
+    "workspaces-not-backed-up": {
+      "message": "Agent session workspaces are kept outside the backup. They are caches of each session's checkpoint, which is backed up, and are rebuilt on the next turn. Idle workspaces are removed after 72 hours (HR_WORKSPACE_TTL_HOURS in /app/data/env). Anything an agent has not finished in a turn is in its checkpoint, not in the backup of its working directory."
+    }
+  },
+  "tags": [
+    "ai",
+    "agents",
+    "api",
+    "automation"
+  ],
+  "icon": "file://logo.png",
+  "persistentDirs": [
+    "/app/workspaces",
+    "/app/ws-markers"
+  ]
+}
