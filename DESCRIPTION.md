@@ -1,5 +1,7 @@
 HarnessRouter is a self-hosted API and console in front of agent command-line tools such as OpenCode, Codex and Claude Code. Your own product or scripts talk to one OpenAI Responses-compatible API; HarnessRouter runs the chosen agent, streams its progress and keeps the transcripts.
 
+This is an unofficial, community-maintained package. It is not supported by the HarnessRouter project: report problems with the package in the [package repository](https://github.com/OrcVole/harnessrouter-cloudron/issues).
+
 <upstream>0.37.13</upstream>
 
 **What this package does**
