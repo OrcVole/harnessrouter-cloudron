@@ -2,7 +2,7 @@ HarnessRouter is a self-hosted API and console in front of agent command-line to
 
 This is an unofficial, community-maintained package. It is not supported by the HarnessRouter project: report problems with the package in the [package repository](https://github.com/OrcVole/harnessrouter-cloudron/issues).
 
-<upstream>0.37.13</upstream>
+<upstream>0.41.16</upstream>
 
 **What this package does**
 

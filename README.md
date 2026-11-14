@@ -14,7 +14,8 @@ gated on a Cloudron 10 test install only (upstream 0.37.13, package 0.1.0).
 - Generates the console password and the secret key on first start; the published default password is refused.
 - **Broker mode** (`HR_SANDBOX_TRUST=broker`): every agent session runs as its own unprivileged user, behind an egress firewall, and provider
   keys stay with the HarnessRouter service, out of the agents' reach. If the firewall cannot be installed, the app refuses to start
-  rather than run agents unconfined. The package needs the `net_admin` capability for this and for nothing else.
+  rather than run agents unconfined. The runner itself (root) is also kept off Cloudron's internal network, because it reaches remote
+  MCP servers on agents' behalf. The package needs the `net_admin` capability for this and for nothing else.
   What was measured, and what the package cannot prevent: `docs/CONTAINMENT.md`.
 - The console keeps its own login. There is no Cloudron login wall (`proxyAuth`): on a test install it took the console's `/login`,
   blocked share links and let any `Authorization: Bearer` header through (details in `docs/CONTAINMENT.md`).
@@ -26,7 +27,7 @@ gated on a Cloudron 10 test install only (upstream 0.37.13, package 0.1.0).
 
 | Script | What it proves |
 |---|---|
-| `test/containment.sh` | run as root inside the app: every firewall rule by name, reachability from a session uid (each "blocked" result has a root control), other loopback listeners refuse a request without a token, read and write isolation of the product's data, what the runner passes to agents, session-to-session isolation on the real layout |
+| `test/containment.sh` | run as root inside the app: every firewall rule by name for sessions, environment builds, installs and root, reachability (each "blocked" result has a control uid that no rule names), other loopback listeners refuse a request without a token, read and write isolation of the product's data, upstream's root-ownership model, that the runner holds no secret, sealed secrets at rest, session-to-session isolation on the real layout |
 | `test/memory-gate/` | idle against production-like load, judged on anonymous memory (see `docs/MEMORY-GATE.md`); `stub.py` is also the broker canary's model |
 | `test/secret-scan.sh` | the pre-publish anonymity and credential scan over the repository and the exact image digest |
 

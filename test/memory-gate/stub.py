@@ -3,8 +3,8 @@
 
 Turn 1: answers with ONE tool call that runs a probe command in the agent's shell.
 Turn 2 (a request carrying the tool result): answers with plain text.
-Every request is appended to stub-requests.jsonl: path, the Authorization header the gateway presented
-(the REAL canary key if broker mode works), and the full body, so the agent's own view of its
+Every request is appended to stub-requests.jsonl: path, the credential headers the gateway presented
+(Authorization, x-api-key and api-key: the REAL canary key if broker mode works), and the full body, so the agent's own view of its
 environment is in the tool-result message of turn 2.
 """
 import json, sys, time
@@ -33,8 +33,15 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code); self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
 
+    def _creds(self):
+        # Every header a client can carry a key in: an OpenAI-shape client sends Authorization, an Anthropic-shape one (and,
+        # since upstream 0.41.4, a custom Anthropic-format connection) sends x-api-key alone, Azure sends api-key. A canary
+        # check that read only Authorization would see nothing in the other two and pass blind.
+        return {"auth": self.headers.get("Authorization"), "x_api_key": self.headers.get("x-api-key"),
+                "api_key": self.headers.get("api-key")}
+
     def do_GET(self):
-        log({"t": time.time(), "method": "GET", "path": self.path, "auth": self.headers.get("Authorization")})
+        log({"t": time.time(), "method": "GET", "path": self.path, **self._creds()})
         self._send({"object": "list", "data": [{"id": "stub-model", "object": "model"}]})
 
     def do_POST(self):
@@ -42,7 +49,7 @@ class H(BaseHTTPRequestHandler):
         raw = self.rfile.read(n).decode("utf-8", "replace")
         try: body = json.loads(raw)
         except Exception: body = {"_raw": raw[:500]}
-        log({"t": time.time(), "method": "POST", "path": self.path, "auth": self.headers.get("Authorization"), "body": body})
+        log({"t": time.time(), "method": "POST", "path": self.path, **self._creds(), "body": body})
         msgs = body.get("messages") or []
         has_tool_result = any(m.get("role") == "tool" for m in msgs)
         tools = body.get("tools") or []

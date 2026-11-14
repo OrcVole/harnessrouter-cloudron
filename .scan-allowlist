@@ -7,3 +7,8 @@ OrcVole@users.noreply.github.com
 # One line of upstream's bundled imagegen skill text (an example photo prompt) trips a generic identity pattern.
 # It is public upstream text, pinned by commit in the Dockerfile.
 sample-prompts.md:25:Primary request: candid photo of an elderly sailor on a small fishing boat adjusting a net
+
+# Reviewed 2026-11-14 (upstream v0.41.16): a unit-test constant whose body is only the generic PKCS#8 RSA header prefix
+# (MIIEvQIBADANBgkqhkiG9w0BAQEFAASC..., identical in every RSA key), truncated, so it cannot be a usable key. Anchored on
+# path AND line, so it fails closed (re-review) whenever upstream edits the file.
+/app/gateway/tests/test_memory_provisioning.py:364:

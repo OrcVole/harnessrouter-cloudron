@@ -2,7 +2,7 @@
 #
 # Not a repack of upstream's image (python:3.12-slim, Debian): the final stage is cloudron/base, as every
 # package here is, and the source is fetched by commit so the build is reproducible. The steps follow upstream's
-# own Dockerfile at the same tag (kept for diffing in the workspace, `upstream-Dockerfile-0.37.13`).
+# own Dockerfile at the same tag (diff it against upstream's `Dockerfile` at HR_COMMIT on every bump).
 #
 # AGENT CLIs ARE NOT IN THIS IMAGE. Claude Code and hermes-agent cannot be redistributed in a public
 # image (upstream's own licensing note), so upstream's entrypoint installs them on first start into the
@@ -10,8 +10,8 @@
 # changes that. Starter Kits (licence not yet read) are not built in.
 #
 # Pins: UPSTREAM_VERSION and HR_COMMIT move together; HR_SKILLS_REF is a commit sha, never `main`.
-ARG UPSTREAM_VERSION=0.37.13
-ARG HR_COMMIT=558a8bbbd548c57e6b5afb21541993a164a94203
+ARG UPSTREAM_VERSION=0.41.16
+ARG HR_COMMIT=88d221ae797868064520224c593b91c49c6736da
 ARG HR_SKILLS_REF=1553417dca0e5e2f9378a1e0ff5ebc260c894cea
 
 FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uvbin
@@ -31,10 +31,22 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends git ca-certi
     && rm -rf /var/lib/apt/lists/*
 # .npmrc carries legacy-peer-deps, without which npm refuses the tree.
 COPY --from=src /src/ui/package.json /src/ui/package-lock.json* /src/ui/.npmrc ./
+# vendor/no-sharp stands in for sharp (package.json: "sharp": "file:./vendor/no-sharp"), so npm ci needs it first. It
+# also keeps the LGPL libvips binaries out of the image; the image optimiser is off upstream since 0.37.16.
+COPY --from=src /src/ui/vendor ./vendor
 RUN npm ci --no-audit --no-fund
 COPY --from=src /src/ui/ ./
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_HR_EDITION=selfhost
 RUN npm run build
+# The bundles cannot carry their packages' licence notices, so the image carries them in one file (upstream's NOTICE).
+RUN node scripts/third-party-licenses.mjs > THIRD-PARTY-console.txt && test -s THIRD-PARTY-console.txt
+
+# ---- the prompt hand-over library (runner/prompt_argv.c) -------------------------------------------------
+# The runner hands jcode its prompt through it instead of its command line. Built on the runtime's own base so it links
+# against the same glibc; only the .so leaves this stage.
+FROM docker.io/cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee AS promptargv
+COPY --from=src /src/runner/prompt_argv.c /src/prompt_argv.c
+RUN gcc -shared -fPIC -O2 -Wall -Wextra -Werror -o /src/prompt_argv.so /src/prompt_argv.c
 
 # ---- runtime ---------------------------------------------------------------------------------------------
 FROM docker.io/cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee
@@ -116,11 +128,14 @@ RUN mkdir -p /opt/harnessrouter/kits
 
 COPY --from=src /src/gateway/ /app/gateway/
 COPY --from=src /src/runner/  /app/runner/
+COPY --from=promptargv /src/prompt_argv.so /app/runner/prompt_argv.so
 COPY --from=src /src/docker/entrypoint.sh /app/entrypoint.sh
 COPY --from=src /src/docker/locks/ /app/locks/
 COPY --from=src /src/docker/hr-retention /usr/local/bin/hr-retention
 # Apache-2.0 section 4(d): a redistribution carries upstream's NOTICE (and its LICENSE beside it).
+# upstream's deploy/memories is a host-side Docker stack and is not copied.
 COPY --from=src /src/LICENSE /src/NOTICE /app/
+COPY --from=ui /ui/THIRD-PARTY-console.txt /app/THIRD-PARTY-console.txt
 RUN chmod +x /app/entrypoint.sh /usr/local/bin/hr-retention
 
 COPY --from=ui /ui/.next/standalone /app/ui/
@@ -132,6 +147,10 @@ COPY --from=ui /ui/public           /app/ui/public
 # needs root). Cloudron's root filesystem is READ-ONLY, and upstream's entrypoint writes two paths in it on
 # every boot (measured locally): /env and /etc/profile.d/hr-environment.sh. Neither patches upstream: /env is a
 # symlink into the data volume (start.sh creates the target) and the profile file a symlink into /run.
+# Everything under /app is root's and writable by nobody else (GHSA-mm72-wr37-26pv: root runs the entrypoint and the runner
+# from here). Compiled here because nobody can write __pycache__ at run time. The prompt launchers run as each session's uid
+# and are read-only to everyone. Next's cache, the one place upstream lets the product write under /app, is a link into
+# /run (start.sh makes it, owned by the product's user); Cloudron's root filesystem is read-only anyway.
 RUN useradd -M -u 10001 agent \
  && rm -rf /home/agent && ln -s /app/data/home /home/agent \
  && ln -s /app/data/.hr-env /env \
@@ -139,7 +158,12 @@ RUN useradd -M -u 10001 agent \
  && rm -rf /var/tmp && ln -s /tmp /var/tmp \
  && rm -f /etc/profile.d/hr-environment.sh && ln -s /run/hr-environment.sh /etc/profile.d/hr-environment.sh \
  && rm -rf /root/.npm /root/.cache \
- && chown -R agent:agent /app/gateway /app/runner /app/ui /app/locks \
+ && rm -rf /app/ui/.next/cache && ln -s /run/hr-next-cache /app/ui/.next/cache \
+ && chown -R root:root /app && chmod -R go-w,a+rX /app \
+ && chmod 0444 /app/runner/prompt_launcher.py /app/runner/prompt_launcher.mjs /app/runner/prompt_preload.cjs \
+ && chmod 0555 /app/runner/prompt_argv.so \
+ && /usr/local/bin/python3 -m compileall -q /app/gateway /app/runner \
+ && test -n "$(find /app/runner/__pycache__ -name '*.cpython-312.pyc' -print -quit)" \
  && chmod -R a+rX /opt/harnessrouter
 
 ENV HOME=/home/agent HR_DATA_DIR=/app/data HARNESS_WORKSPACE=/app/data/workspaces
